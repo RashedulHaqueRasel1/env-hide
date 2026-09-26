@@ -1,0 +1,41 @@
+{
+  "name": "env-hide",
+  "version": "1.0.0",
+  "description": "Encrypt .env files for safe repository storage.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "env-hide": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/index.test.js",
+    "postinstall": "node ./dist/postinstall.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "env",
+    "dotenv",
+    "secrets",
+    "encryption",
+    "argon2"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "argon2": "^0.41.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "typescript": "^5.7.2"
+  }
+}
