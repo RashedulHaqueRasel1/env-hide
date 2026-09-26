@@ -72,7 +72,8 @@ unknown/missing required structure, wrong version/algorithm, invalid base64,
 
 ## 5. `lock` flow
 
-1. CLI দেখে `.env` এবং/অথবা `.env.local` readable আছে কি না।
+1. CLI দেখে `.env` এবং/অথবা `.env.local` readable আছে কি না। `init` কোনো
+   placeholder secret file তৈরি করে না।
 2. একবার password এবং confirmation নেয়; password empty হলে reject হয়।
 3. প্রতিটি present source file memory-তে পড়ে এবং `encryptEnv` চালায়।
 4. তৈরি encrypted content memory-তেই decrypt করে byte-for-byte original-এর

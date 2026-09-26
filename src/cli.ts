@@ -36,10 +36,8 @@ async function password(prompt: string): Promise<string> {
 function ok(message: string): void { output.write(`✓ ${message}\n`); }
 async function init(): Promise<void> {
   const added = await ensureEnvIgnored(cwd());
-  for (const name of ENV_FILENAMES) if (!(await exists(pathFor(secretName(name))))) await atomicWrite(pathFor(secretName(name)), "", 0o600);
   ok(added.length ? `Added ${added.join(" and ")} to .gitignore` : ".env and .env.local are already ignored");
-  ok("Created or verified .env.secret and .env.local.secret");
-  output.write("Create .env and/or .env.local, then run env-hide lock before committing their .secret files.\n");
+  output.write("Create .env and/or .env.local, then run env-hide lock to create only the matching .secret file.\n");
 }
 async function lock(): Promise<void> {
   const sources = (await Promise.all(ENV_FILENAMES.map(async (name) => ({ name, present: await exists(pathFor(name)) })))).filter((item) => item.present);

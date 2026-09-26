@@ -41,9 +41,9 @@ Install সফল হলে package-এর post-install step ওই project-এ�
 npx env-hide init
 ```
 
-এটি `.gitignore` configure করে এবং placeholder `.env.secret` ও
-`.env.local.secret` তৈরি করে। এরপর আপনার প্রয়োজনমতো `.env`, `.env.local`, বা
-দুটিই বানান।
+এটি শুধু `.gitignore` configure করে; কোনো empty `.secret` file তৈরি করে না।
+এরপর আপনার প্রয়োজনমতো `.env`, `.env.local`, বা দুটিই বানান। `lock` কেবল যে
+plaintext file বাস্তবে আছে, তার matching `.secret` file তৈরি করবে।
 
 ## Encrypt / lock
 

@@ -57,7 +57,7 @@ npx env-hide unlock
 
 | Command | Description |
 | --- | --- |
-| `npx env-hide init` | Adds `.env` and `.env.local` to `.gitignore`; creates encrypted-file placeholders if missing. |
+| `npx env-hide init` | Adds `.env` and `.env.local` to `.gitignore`; it does not create empty encrypted files. |
 | `npx env-hide lock` | Encrypts each present plaintext file into its matching `.secret` file. |
 | `npx env-hide unlock` | Restores each present encrypted file as its matching plaintext file. |
 | `npx env-hide status` | Shows file presence, ignore configuration, and encrypted-format status. |
@@ -189,9 +189,9 @@ This appends missing rules without replacing existing `.gitignore` content.
 
 Use the exact password used during `lock`. If the password is correct, restore the encrypted file from a trusted Git revision or backup; do not manually edit a `.secret` file.
 
-### A `.secret` file is invalid immediately after `init`
+### No `.secret` file exists after `init`
 
-`init` creates an empty placeholder. Create your plaintext environment file and run `npx env-hide lock` to produce a valid encrypted file.
+This is expected. `init` only configures `.gitignore`. Create `.env` and/or `.env.local`, then run `npx env-hide lock`; it creates only the matching encrypted file or files.
 
 ## Development and release checks
 
@@ -205,6 +205,11 @@ npm publish --dry-run
 
 The last command validates the release workflow but does not upload the package. For an actual release, log in with `npm login` and then run `npm publish`.
 
-## License
+## Author
 
-[MIT](LICENSE)
+**Rashedul Haque Rasel**
+
+- Email: [rashedulhaquerasel1@gmail.com](mailto:rashedulhaquerasel1@gmail.com)
+- LinkedIn: [Rashedul Haque Rasel](https://www.linkedin.com/in/rashedul-haque-rasel/?isSelfProfile=true)
+- GitHub: [RashedulHaqueRasel1](https://github.com/RashedulHaqueRasel1/)
+- Portfolio: [rashedul-haque-rasel.vercel.app](https://rashedul-haque-rasel.vercel.app)
