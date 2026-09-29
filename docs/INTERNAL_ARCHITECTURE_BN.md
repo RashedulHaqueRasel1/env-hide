@@ -15,7 +15,7 @@ compiled output ছাড়া package পাঠানো হয় না। Node.js
 
 ## 2. File mapping
 
-`src/files.ts`-এর `ENV_FILENAMES` হলো single source of truth:
+`src/config/env-files.ts`-এর `ENV_FILENAMES` হলো single source of truth:
 
 ```ts
 [".env", ".env.local"]
@@ -33,13 +33,13 @@ CLI এই list ধরে প্রতিটির `.secret` name বানা�
 
 ## 3. Password থেকে key বানানো
 
-`src/index.ts` password-কে কখনও AES key হিসেবে সরাসরি ব্যবহার করে না। প্রতিবার
+`src/core/crypto.ts` password-কে কখনও AES key হিসেবে সরাসরি ব্যবহার করে না। প্রতিবার
 lock-এর সময় secure random 16-byte salt তৈরি হয়। তারপর:
 
 ```text
 password + salt
       ↓
-Argon2id (timeCost=3, memoryCost=65536 KiB, parallelism=1)
+Argon2id (timeCost=4, memoryCost=131072 KiB, parallelism=1)
       ↓
 32-byte / 256-bit key
 ```
@@ -57,18 +57,23 @@ Key তৈরির পর Node-এর `node:crypto` দিয়ে AES-256-GCM �
 Output text format:
 
 ```text
-ENVHIDE:v1
+ENVHIDE:v2
 kdf=argon2id
 cipher=aes-256-gcm
+memoryCost=131072
+timeCost=4
+parallelism=1
 salt=<base64>
 iv=<base64>
 tag=<base64>
 data=<base64>
 ```
 
-Base64 কেবল bytes-কে text file-এ রাখে; এটি encryption নয়। Parser duplicate,
-unknown/missing required structure, wrong version/algorithm, invalid base64,
-এবং wrong salt/IV/tag length reject করে।
+Base64 কেবল bytes-কে text file-এ রাখে; এটি encryption নয়। v2-তে KDF metadata
+AES-GCM authenticated data হিসেবে সুরক্ষিত থাকে। Parser duplicate, unknown/missing
+required structure, wrong version/algorithm, invalid base64, unsafe KDF cost, এবং
+wrong salt/IV/tag length reject করে। পুরোনো v1 file decrypt করা যায়; আবার `lock`
+করলে v2 format-এ migrate হবে।
 
 ## 5. `lock` flow
 
@@ -118,7 +123,7 @@ failure এক message-এ রাখে। Normal mode stack trace print কর�
 
 ## 9. npm install hook
 
-`src/postinstall.ts` npm-এর `INIT_CWD` থেকে consuming project directory পায়।
+`src/scripts/postinstall.ts` npm-এর `INIT_CWD` থেকে consuming project directory পায়।
 Local install হলে সেখানকার `.gitignore` read করে missing `.env` এবং
 `.env.local` line append করে। Global install এ এটি immediately return করে।
 Permission/write error হলে install fail না করে silently return করে; user তখন
@@ -126,7 +131,7 @@ Permission/write error হলে install fail না করে silently return �
 
 ## 10. Tests ও release validation
 
-`src/index.test.ts` Node built-in test runner ব্যবহার করে। Tests exact
+`src/__tests__/crypto.test.ts` Node built-in test runner ব্যবহার করে। Tests exact
 round-trip, empty/large/Unicode content, Unicode password, different random
 output, empty/wrong password, malformed/version/truncated/tampered file check
 করে।

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import argon2 from "argon2";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { DecryptionError, EnvHideError } from "./errors.js";
@@ -105,3 +106,16 @@ export function parseEncryptedEnv(encrypted: string | Buffer): EncryptedEnv {
 }
 
 export { DecryptionError, EnvHideError };
+=======
+/** Public programmatic API for env-hide consumers. */
+export {
+  decryptEnv,
+  encryptEnv,
+  parseEncryptedEnv,
+  serializeEncryptedEnv,
+  FORMAT_HEADER,
+  DecryptionError,
+  EnvHideError,
+} from "./core/crypto.js";
+export type { EncryptedEnv } from "./core/crypto.js";
+>>>>>>> c17f906 (refactor: restructure codebase into modular components)

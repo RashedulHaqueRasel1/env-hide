@@ -133,12 +133,15 @@ AES-256-GCM + random 12-byte IV
        encrypted file
 ```
 
-The encrypted text is versioned and machine-readable:
+New encrypted files use the versioned, machine-readable `v2` format:
 
 ```text
-ENVHIDE:v1
+ENVHIDE:v2
 kdf=argon2id
 cipher=aes-256-gcm
+memoryCost=131072
+timeCost=4
+parallelism=1
 salt=<base64>
 iv=<base64>
 tag=<base64>
@@ -146,6 +149,7 @@ data=<base64>
 ```
 
 Salt and IV are not secret. Base64 is binary-to-text encoding, not encryption. AES-GCM authentication detects changes to the protected data.
+The v2 metadata, including its KDF settings, is authenticated by AES-GCM. `unlock` remains compatible with legacy `ENVHIDE:v1` files; run `lock` again after a successful unlock to migrate them to v2.
 
 ### What it protects
 

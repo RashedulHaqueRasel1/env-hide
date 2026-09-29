@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "name": "env-hide",
   "version": "1.0.0",
@@ -42,3 +43,49 @@
     "typescript": "^5.7.2"
   }
 }
+=======
+{
+  "name": "env-hide",
+  "version": "1.0.0",
+  "description": "Encrypt .env files for safe repository storage.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "env-hide": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "test": "npm run clean && tsc -p tsconfig.test.json && node --test dist/__tests__/crypto.test.js",
+    "postinstall": "node ./dist/scripts/postinstall.js",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "env",
+    "dotenv",
+    "secrets",
+    "encryption",
+    "argon2"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "argon2": "^0.41.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "env-hide": "^1.2.61",
+    "typescript": "^5.7.2"
+  }
+}
+>>>>>>> c17f906 (refactor: restructure codebase into modular components)
