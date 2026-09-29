@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+# env-hide plaintext environment-file guard
+set -eu
+
+fail() {
+  printf '%s\n' "env-hide: $1" >&2
+  exit 1
+}
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$root"
+
+[ -f .gitignore ] || fail ".gitignore is missing. Add .env and .env.local before pushing."
+grep -Fqx '.env' .gitignore || fail ".env is not ignored. Run: node dist/cli.js init"
+grep -Fqx '.env.local' .gitignore || fail ".env.local is not ignored. Run: node dist/cli.js init"
+
+for file in .env .env.local; do
+  if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+    fail "$file is tracked by Git. Remove it from the index, rotate its secrets, then push again."
+  fi
+done
+
+exit 0

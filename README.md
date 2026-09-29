@@ -102,6 +102,20 @@ npx env-hide check
 
 ## Git workflow
 
+### Plaintext push protection
+
+This repository includes a Git pre-push guard. Enable it once after cloning:
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/pre-push
+```
+
+The guard blocks a push when `.env` or `.env.local` is tracked, or either required
+ignore rule has been removed. A matching GitHub Actions check is included in this
+repository. To make the remote check mandatory, configure it as a required status
+check in the repository's protected-branch rules.
+
 Commit encrypted files:
 
 ```bash

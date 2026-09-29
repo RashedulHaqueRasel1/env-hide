@@ -1,0 +1,20 @@
+name: Prevent plaintext environment files
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  env-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require plaintext environment files to be ignored and untracked
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .gitignore
+          grep -Fqx '.env' .gitignore
+          grep -Fqx '.env.local' .gitignore
+          ! git ls-files --error-unmatch .env >/dev/null 2>&1
+          ! git ls-files --error-unmatch .env.local >/dev/null 2>&1
