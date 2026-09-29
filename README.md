@@ -221,7 +221,7 @@ npm pack --dry-run
 npm publish --dry-run
 ```
 
-The last command validates the release workflow but does not upload the package. For an actual release, log in with `npm login` and then run `npm publish`.
+The last command validates the release workflow but does not upload the package. For an actual release, log in with `npm login` and then run `npm publish`. .....
 
 ## Author
 
