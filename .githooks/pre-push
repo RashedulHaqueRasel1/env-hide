@@ -3,20 +3,30 @@
 set -eu
 
 fail() {
-  printf '%s\n' "env-hide: $1" >&2
+  printf '%s\n' "env-hide: PUSH BLOCKED — $1" >&2
   exit 1
 }
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$root"
 
-[ -f .gitignore ] || fail ".gitignore is missing. Add .env and .env.local before pushing."
+[ -f .gitignore ] || fail ".gitignore is missing. Run: node dist/cli.js init"
 grep -Fqx '.env' .gitignore || fail ".env is not ignored. Run: node dist/cli.js init"
 grep -Fqx '.env.local' .gitignore || fail ".env.local is not ignored. Run: node dist/cli.js init"
 
 for file in .env .env.local; do
   if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
-    fail "$file is tracked by Git. Remove it from the index, rotate its secrets, then push again."
+    printf '%s\n' "env-hide: PUSH BLOCKED — $file is tracked by Git." >&2
+    printf '%s\n' "" >&2
+    printf '%s\n' "Plaintext environment files must never be committed." >&2
+    printf '%s\n' "Run these commands, then try git push again:" >&2
+    printf '%s\n' "" >&2
+    printf '%s\n' "  git rm --cached --ignore-unmatch .env .env.local" >&2
+    printf '%s\n' "  git add .gitignore .githooks/pre-push .github/workflows/env-guard.yml" >&2
+    printf '%s\n' "  git commit -m \"Block plaintext environment files\"" >&2
+    printf '%s\n' "" >&2
+    printf '%s\n' "If a real secret was committed earlier, rotate that secret before pushing." >&2
+    exit 1
   fi
 done
 
