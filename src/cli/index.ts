@@ -4,6 +4,7 @@ import { stdout as output, cwd } from "node:process";
 import { join } from "node:path";
 import { decryptEnv, encryptEnv, parseEncryptedEnv } from "../core/crypto.js";
 import { EnvHideError } from "../core/errors.js";
+import { attachRecoverySlots, generateRecoveryCodes, recoverPasswordFromSecret } from "../core/recovery.js";
 import { ENV_FILENAMES, secretFilename } from "../config/env-files.js";
 import {
   atomicWrite,
@@ -24,6 +25,7 @@ Commands:
   init       configure .gitignore for .env and .env.local
   lock       encrypt present environment files into matching .secret files
   unlock     restore present encrypted environment files
+  forget     reset the password with an emergency recovery code
   status     show configuration and encryption status
   check      fail if encrypted files are invalid or plaintext files are not ignored
   version    print the version
@@ -73,14 +75,31 @@ async function lock(): Promise<void> {
       return { name, secret };
     }),
   );
+  const codes = generateRecoveryCodes();
   for (const item of encrypted) {
-    await atomicWrite(pathFor(secretName(item.name)), item.secret, 0o600);
+    await atomicWrite(pathFor(secretName(item.name)), await attachRecoverySlots(item.secret, first, codes), 0o600);
     ok(`Encrypted ${item.name} → ${secretName(item.name)}`);
   }
   await ensureEnvIgnored(cwd());
+  output.write("\nStore these emergency recovery codes in a password manager. They are shown only once:\n");
+  for (const code of codes) output.write(`${code}\n`);
   output.write(
     "You can now commit the generated .secret files to your repository.\n",
   );
+}
+async function forget(): Promise<void> {
+  const sources = (await Promise.all(ENV_FILENAMES.map(async (name) => ({ name, present: await exists(pathFor(secretName(name))) })))).filter((item) => item.present);
+  if (!sources.length) throw new EnvHideError("Encrypted environment file not found.");
+  const code = await password("Enter recovery code: ");
+  const oldPassword = await recoverPasswordFromSecret(await readFile(pathFor(secretName(sources[0]!.name))), code);
+  const next = await password("Enter new password: "), confirm = await password("Confirm new password: ");
+  if (next !== confirm) throw new EnvHideError("Passwords do not match.", 2);
+  const values = await Promise.all(sources.map(async ({ name }) => ({ name, value: await decryptEnv(await readFile(pathFor(secretName(name))), oldPassword) })));
+  const codes = generateRecoveryCodes();
+  const encrypted = await Promise.all(values.map(async ({ name, value }) => ({ name, secret: await encryptEnv(value, next) })));
+  for (const item of encrypted) await atomicWrite(pathFor(secretName(item.name)), await attachRecoverySlots(item.secret, next, codes), 0o600);
+  output.write("Password reset. Old recovery codes are revoked. Store these new codes securely:\n");
+  for (const nextCode of codes) output.write(`${nextCode}\n`);
 }
 async function unlock(): Promise<void> {
   const sources = (
@@ -162,6 +181,7 @@ export async function runCli(args = process.argv.slice(2)): Promise<void> {
   if (command === "init") return init();
   if (command === "lock") return lock();
   if (command === "unlock") return unlock();
+  if (command === "forget") return forget();
   if (command === "status") return void (await status());
   if (command === "check") {
     if (!(await status(true)))

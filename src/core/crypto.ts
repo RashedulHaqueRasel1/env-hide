@@ -210,8 +210,10 @@ export function parseEncryptedEnv(encrypted: string | Buffer): EncryptedEnv {
     "data",
   ] as const;
   const required = header === FORMAT_HEADER ? v2 : base;
+  const recoveryFields = Array.from({ length: 3 }, (_, index) => [`slot${index + 1}Salt`, `slot${index + 1}Iv`, `slot${index + 1}Tag`, `slot${index + 1}Data`]).flat();
+  const hasRecovery = header === FORMAT_HEADER && recoveryFields.every((field) => fields.has(field));
   if (
-    fields.size !== required.length ||
+    fields.size !== required.length + (hasRecovery ? recoveryFields.length : 0) ||
     required.some((field) => !fields.has(field)) ||
     fields.get("kdf") !== "argon2id" ||
     fields.get("cipher") !== "aes-256-gcm"

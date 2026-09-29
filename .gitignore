@@ -2,3 +2,5 @@ node_modules/
 dist/
 
 config.bat
+.env
+.env.local
