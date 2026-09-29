@@ -1,52 +1,66 @@
 # env-hide
 
-Encrypt `.env` and `.env.local` files before committing them to Git.
+Encrypt `.env` and `.env.local` before committing their encrypted counterparts to Git.
 
-`env-hide` keeps plaintext environment files out of version control and creates encrypted counterparts that a team can commit safely.
+`env-hide` keeps plaintext environment files local and turns them into authenticated, versioned `.secret` files that can live in a public repository. It uses Argon2id and AES-256-GCM, includes emergency recovery codes, and supports safe password rotation.
 
-| Plaintext (ignored by Git) | Encrypted (commit to Git) |
-| --- | --- |
-| `.env` | `.env.secret` |
-| `.env.local` | `.env.local.secret` |
+> An encrypted file is only as safe as its password and recovery codes. Use long, unique secrets from a password manager.
 
-It uses **Argon2id** to derive an encryption key from a password and **AES-256-GCM** to encrypt and authenticate the complete file. Passwords, keys, and plaintext secret values are never written to an encrypted file or printed by the CLI.
+## Features
+
+- Encrypts `.env` → `.env.secret` and `.env.local` → `.env.local.secret`
+- Uses Argon2id key derivation and AES-256-GCM authenticated encryption
+- Uses fresh random salts and IVs for every encryption
+- Generates three high-entropy emergency recovery codes at `lock` time
+- Resets a forgotten password with `env-hide forget`
+- Prevents partial restore: all files must decrypt before plaintext is written
+- Uses atomic file writes with restrictive `0600` permissions
+- Supports legacy `ENVHIDE:v1` files and writes stronger `ENVHIDE:v2` files
+- Provides `status` and CI-friendly `check` commands
 
 ## Requirements
 
-- Node.js 20 or newer
-- npm 9 or newer recommended
+- Node.js 20 or later
+- npm 9 or later recommended
 
 ## Install
 
-Install it in the project that owns your environment files:
+Install in the project that owns the environment files:
 
 ```bash
 npm install --save-dev env-hide
 ```
 
-On a normal local install, `env-hide` automatically adds `.env` and `.env.local` to that project's `.gitignore` when absent. Existing ignore rules remain unchanged. It intentionally does not ignore `.env.secret` or `.env.local.secret`, because those are the files you commit.
+The install hook attempts to add `.env` and `.env.local` to the consuming project's `.gitignore`. If npm install scripts are disabled, run:
 
-> If your npm configuration disables install scripts, run `npx env-hide init` once after installation.
+```bash
+npx env-hide init
+```
 
 ## Quick start
 
 ```bash
-# Configure Git ignore rules (safe to run more than once)
+# Ensure plaintext files are ignored by Git
 npx env-hide init
 
-# Create one or both plaintext files
+# Create one or both local plaintext files
 printf 'DATABASE_URL=postgres://localhost/app\n' > .env
 printf 'LOG_LEVEL=debug\n' > .env.local
 
-# Encrypt every plaintext environment file that exists
+# Encrypt every plaintext file that exists
 npx env-hide lock
+```
 
-# Commit only encrypted files and .gitignore
+`lock` asks for a password twice. On success, it prints three recovery codes once. Save them in a password manager before closing the terminal.
+
+Commit only the encrypted files:
+
+```bash
 git add .gitignore .env.secret .env.local.secret
 git commit -m "Add encrypted environment configuration"
 ```
 
-Another authorised developer can restore the files after cloning:
+Another authorised developer can clone the repository and restore the files:
 
 ```bash
 npm install
@@ -57,97 +71,52 @@ npx env-hide unlock
 
 | Command | Description |
 | --- | --- |
-| `npx env-hide init` | Adds `.env` and `.env.local` to `.gitignore`; it does not create empty encrypted files. |
-| `npx env-hide lock` | Encrypts each present plaintext file into its matching `.secret` file. |
-| `npx env-hide unlock` | Restores each present encrypted file as its matching plaintext file. |
-| `npx env-hide status` | Shows file presence, ignore configuration, and encrypted-format status. |
-| `npx env-hide check` | Returns non-zero when configuration needs attention; suited to CI. |
+| `npx env-hide init` | Adds `.env` and `.env.local` to `.gitignore`. |
+| `npx env-hide lock` | Encrypts present plaintext files and creates three recovery codes. |
+| `npx env-hide unlock` | Restores available `.secret` files with the main password. |
+| `npx env-hide forget` | Uses one recovery code to set a new password and new recovery codes. |
+| `npx env-hide status` | Reports plaintext, encrypted-file, and ignore-rule status. |
+| `npx env-hide check` | Returns non-zero if ignore rules or encrypted-file format are invalid. |
 | `npx env-hide help` | Shows command help. |
-| `npx env-hide version` | Prints the installed package version. |
+| `npx env-hide version` | Prints the installed version. |
 
 ### File mapping
 
-`lock` processes only plaintext files that exist:
+```text
+.env exists        → .env.secret
+.env.local exists  → .env.local.secret
+```
+
+`lock` processes only files that exist. It does not remove or modify plaintext files. Before writing a `.secret` file, it decrypts the new value in memory and verifies an exact byte-for-byte match.
+
+## Emergency recovery codes
+
+Every successful `lock` creates three random emergency codes, similar to:
 
 ```text
-.env exists        → creates or updates .env.secret
-.env.local exists  → creates or updates .env.local.secret
+envhide-<random-value>
 ```
 
-Before replacing an encrypted file, `env-hide` decrypts the newly generated value in memory and verifies it exactly matches the source. It never deletes or modifies `.env` or `.env.local` during `lock`.
+The same three codes work for both `.env.secret` and `.env.local.secret`. Their encrypted recovery slots are embedded directly in each `.secret` file; no additional recovery file is created or committed.
 
-### Safe unlock behavior
-
-`unlock` decrypts every available encrypted file before writing any plaintext file. If any file fails authentication, no plaintext file is written or overwritten. A wrong password and a corrupted file intentionally produce the same message:
-
-```text
-Invalid password or corrupted secret file.
-```
-
-## Status and CI checks
-
-For a human-readable local report:
+If the main password is forgotten:
 
 ```bash
-npx env-hide status
+npx env-hide forget
 ```
 
-For CI or a pre-commit script:
+Enter one recovery code, choose a new password, and save the newly displayed recovery codes. The current files are re-encrypted and the old recovery codes are replaced.
 
-```bash
-npx env-hide check
-```
+### Recovery-code rules
 
-`check` exits with `0` when setup is valid and `1` when an encrypted file is missing/invalid or a plaintext environment file is not ignored. It does not ask for a password and does not decrypt secrets.
-
-## Git workflow
-
-### Plaintext push protection
-
-This repository includes a Git pre-push guard. Enable it once after cloning:
-
-```bash
-git config core.hooksPath .githooks
-chmod +x .githooks/pre-push
-```
-
-The guard blocks a push when `.env` or `.env.local` is tracked, or either required
-ignore rule has been removed. A matching GitHub Actions check is included in this
-repository. To make the remote check mandatory, configure it as a required status
-check in the repository's protected-branch rules.
-
-Commit encrypted files:
-
-```bash
-git add .gitignore .env.secret .env.local.secret
-```
-
-Never commit these plaintext files:
-
-```text
-.env
-.env.local
-```
-
-Adding a file to `.gitignore` does not remove it from existing Git history. If plaintext credentials were previously committed, revoke or rotate them and follow your organisation's Git-history remediation procedure.
+- Treat a recovery code like the main password.
+- Store codes in a password manager or approved team vault.
+- Never put codes in Git, `.env`, chat, screenshots, or a plaintext note.
+- A locally stored encrypted file cannot enforce global one-time use: an old Git revision or copied file can contain old recovery slots. For globally enforced one-time codes, use a central service or KMS.
 
 ## Security model
 
-Every `lock` creates fresh random values:
-
-```text
-password + random 16-byte salt
-              ↓
-         Argon2id
-              ↓
-        256-bit key
-              ↓
-AES-256-GCM + random 12-byte IV
-              ↓
-       encrypted file
-```
-
-New encrypted files use the versioned, machine-readable `v2` format:
+New encrypted files use this text format:
 
 ```text
 ENVHIDE:v2
@@ -160,27 +129,93 @@ salt=<base64>
 iv=<base64>
 tag=<base64>
 data=<base64>
+slot1Salt=<base64>
+slot1Iv=<base64>
+slot1Tag=<base64>
+slot1Data=<base64>
+... slot2 and slot3
 ```
 
-Salt and IV are not secret. Base64 is binary-to-text encoding, not encryption. AES-GCM authentication detects changes to the protected data.
-The v2 metadata, including its KDF settings, is authenticated by AES-GCM. `unlock` remains compatible with legacy `ENVHIDE:v1` files; run `lock` again after a successful unlock to migrate them to v2.
+The main encryption flow is:
+
+```text
+password + random 16-byte salt
+              ↓
+Argon2id (128 MiB memory, time cost 4, parallelism 1)
+              ↓
+256-bit key
+              ↓
+AES-256-GCM + random 12-byte IV
+              ↓
+encrypted file + 128-bit authentication tag
+```
+
+Salt, IV, tags, and Base64 values are not passwords. Base64 is an encoding, not encryption. The AES-GCM tag detects modification; v2 also authenticates its main KDF metadata.
 
 ### What it protects
 
-- Accidental plaintext `.env` or `.env.local` commits.
-- Repository readers who do not know the password.
-- Undetected modification of an encrypted file.
+- Accidental plaintext `.env` and `.env.local` commits when Git ignore rules are followed
+- Repository readers who do not know the password or recovery code
+- Tampering with encrypted data
 
 ### What it does not protect
 
-- A compromised computer while plaintext files are present.
-- Anyone who knows the encryption password.
-- Secrets leaked through logs, backups, screenshots, shell history, or old Git commits.
-- Weak or reused passwords.
+- Weak, reused, exposed, or guessable passwords
+- A leaked recovery code
+- A compromised machine while plaintext files are present
+- Secrets copied to logs, screenshots, backups, shell history, or earlier Git commits
+- An attacker with unlimited offline guesses against a public encrypted file
 
-Use a long, unique password stored in an approved password manager. Share it through a controlled team vault, never through Git or ordinary chat. Password recovery is not possible; without the password, encrypted files cannot be decrypted.
+Public source code and public `.secret` files are acceptable: cryptographic formats do not need to be hidden. Use a password-manager-generated password of at least 20 characters or a long random passphrase.
 
-When a former team member knew the password, rotate the actual secrets inside the files (database password, API keys, JWT secret, and so on), then lock again with a new password.
+### If a password or code leaks
+
+1. Rotate the actual API keys, database passwords, tokens, and other values inside the environment files.
+2. Run `npx env-hide lock` with a new password.
+3. Store the newly generated recovery codes securely.
+4. Commit the newly encrypted files.
+
+Changing only the encryption password does not protect secrets in an older Git revision that an attacker already decrypted.
+
+## Git safety
+
+Never commit plaintext files:
+
+```text
+.env
+.env.local
+```
+
+Check whether they are tracked:
+
+```bash
+git ls-files .env .env.local
+```
+
+No output is the expected result. If files appear, remove them from the index and rotate exposed secrets:
+
+```bash
+git rm --cached --ignore-unmatch .env .env.local
+git commit -m "Remove plaintext environment files"
+```
+
+This repository includes a local `.githooks/pre-push` guard and a GitHub Actions `env-guard` workflow. Repository maintainers should enable the local guard once:
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/pre-push
+```
+
+For enforced remote protection, make the `env-guard` status check required in the GitHub branch ruleset and restrict bypass permissions. Local hooks alone can be bypassed with `--no-verify` or by changing local Git configuration.
+
+## Status and automation
+
+```bash
+npx env-hide status
+npx env-hide check
+```
+
+`check` does not ask for a password and does not decrypt secrets. It exits with `0` only when at least one encrypted file exists, all present encrypted files have a valid format, and both plaintext filenames are ignored.
 
 ## Programmatic API
 
@@ -191,43 +226,53 @@ const encrypted = await encryptEnv("API_KEY=example\n", password);
 const plaintext = await decryptEnv(encrypted, password); // Buffer
 ```
 
-`decryptEnv` returns a `Buffer` so handling plaintext stays explicit. Never log the password, plaintext buffer, or source environment contents.
+`decryptEnv` returns a `Buffer` so plaintext handling stays explicit. Do not log passwords, plaintext buffers, or environment-file contents.
 
 ## Troubleshooting
 
-### Plaintext files are not ignored
+### `.env` is not ignored
 
 ```bash
 npx env-hide init
 ```
 
-This appends missing rules without replacing existing `.gitignore` content.
-
 ### `Invalid password or corrupted secret file.`
 
-Use the exact password used during `lock`. If the password is correct, restore the encrypted file from a trusted Git revision or backup; do not manually edit a `.secret` file.
+Use the exact password used during `lock`. If the password is correct, restore a trusted encrypted revision or backup. Do not manually edit `.secret` files.
 
-### No `.secret` file exists after `init`
+### No recovery code is available
 
-This is expected. `init` only configures `.gitignore`. Create `.env` and/or `.env.local`, then run `npx env-hide lock`; it creates only the matching encrypted file or files.
+Files created before recovery support do not contain recovery slots. If the main password is also lost, decryption is impossible. If you still know the password, run `npx env-hide lock` again to create recovery slots.
 
-## Development and release checks
+### `npx env-hide` runs an unexpected version
 
-From this repository:
+Build and run local source directly when developing this repository:
 
 ```bash
+npm run build
+node dist/cli.js help
+```
+
+## Development and release
+
+```bash
+npm ci
 npm test
 npm pack --dry-run
 npm publish --dry-run
 ```
 
-The last command validates the release workflow but does not upload the package. For an actual release, log in with `npm login` and then run `npm publish`. .....
+Publish for real only after reviewing the package contents:
+
+```bash
+npm login
+npm publish
+```
 
 ## Author
 
 **Rashedul Haque Rasel**
 
 - Email: [rashedulhaquerasel1@gmail.com](mailto:rashedulhaquerasel1@gmail.com)
-- LinkedIn: [Rashedul Haque Rasel](https://www.linkedin.com/in/rashedul-haque-rasel/?isSelfProfile=true)
 - GitHub: [RashedulHaqueRasel1](https://github.com/RashedulHaqueRasel1/)
 - Portfolio: [rashedul-haque-rasel.vercel.app](https://rashedul-haque-rasel.vercel.app)
